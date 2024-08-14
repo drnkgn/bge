@@ -72,7 +72,6 @@ let mousePos = new Vec2();
 let keyState: { [key: string]: boolean } = {};
 let isMoving = false;
 let isJumping = false;
-let isGrappling = false;
 let framePerSecond = 0;
 let frameCounter = 0;
 let elapsedTime = 0;
@@ -120,14 +119,6 @@ const loop = () => {
     } else {
         isMoving = false;
     }
-    if (keyState["m1"] && !isGrappling) {
-        isGrappling = true;
-        let mouseVecFromPly = mousePos.sub(position);
-        direction.x = mouseVecFromPly.x < 0 ? -1 : 1;
-        mouseVecFromPly = mouseVecFromPly.norm().scale(12);
-        velocity.x = Math.abs(mouseVecFromPly.x);
-        velocity.y = mouseVecFromPly.y;
-    }
 
     if (position.y != canvas.height - 20 || velocity.y < 0) {
         velocity.y += delta * gravity;
@@ -135,7 +126,6 @@ const loop = () => {
         position.y = Math.min(canvas.height - 20, position.y);
     } else {
         isJumping = false;
-        isGrappling = false;
         velocity.y = 0;
     }
 
@@ -167,8 +157,8 @@ const loop = () => {
     ctx.font = "15px Arial";
     ctx.fillText(`vel_x: ${velocity.x.toFixed(5)}`, 0, 15);
     ctx.fillText(`vel_y: ${velocity.y.toFixed(5)}`, 0, 30);
-    ctx.fillText(`mouse_pos: (${mousePos.x.toFixed(2)}, ${mousePos.y.toFixed(2)})`, 0, 45);
-    ctx.fillText(`fps: ${framePerSecond}`, 0, 60);
+    // ctx.fillText(`mouse_pos: (${mousePos.x.toFixed(2)}, ${mousePos.y.toFixed(2)})`, 0, 45);
+    ctx.fillText(`fps: ${framePerSecond}`, 0, 45);
 };
 
 loop();
