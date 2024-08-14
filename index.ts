@@ -7,15 +7,21 @@ class Vec2 {
         this.y = y;
     }
 
-    norm() {
-        let magnitude = Math.sqrt(this.x*this.x + this.y*this.y);
-        this.x = this.x/magnitude;
-        this.y = this.y/magnitude;
+    add(o: Vec2): Vec2 {
+        return new Vec2(this.x + o.x, this.y + o.y);
     }
 
-    mult(s: number) {
-        this.x *= s;
-        this.y *= s;
+    sub(o: Vec2): Vec2 {
+        return new Vec2(this.x - o.x, this.y - o.y);
+    }
+
+    norm(): Vec2 {
+        let length = Math.sqrt(this.x*this.x + this.y*this.y);
+        return new Vec2(this.x/length, this.y/length);
+    }
+
+    scale(s: number): Vec2 {
+        return new Vec2(this.x * s, this.y * s);
     }
 };
 
@@ -25,10 +31,7 @@ class Rect {
     width: number;
     height: number;
 
-    constructor(
-        x: number = 0, y: number = 0,
-        width: number = 0, height: number = 0
-    ) {
+    constructor(x: number, y: number, width: number, height: number) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -58,19 +61,21 @@ const ctx = canvas?.getContext("2d")!;
 canvas.width = 400;
 canvas.height = 400;
 
-const gravity = 0.02;
-const accel = 0.01;
-const fps = 60;
-const requiredElapsed = 1000/fps;
+const gravity = 20;
+const accel = 10;
+const friction = 5;
 const position = new Vec2(canvas.width/2, canvas.height/2);
 const velocity = new Vec2();
 const direction = new Vec2();
-const platform = new Rect(0, 200, 20, 100);
+const platform = new Rect(150, 350, 100, 20);
 let mousePos = new Vec2();
 let keyState: { [key: string]: boolean } = {};
 let isMoving = false;
 let isJumping = false;
 let isGrappling = false;
+let framePerSecond = 0;
+let frameCounter = 0;
+let elapsedTime = 0;
 let lastTime = Date.now();
 let currentTime = lastTime;
 let delta = 0;
@@ -100,56 +105,56 @@ const loop = () => {
     window.requestAnimationFrame(loop);
 
     currentTime = Date.now();
-    delta = currentTime - lastTime;
+    delta = (currentTime - lastTime)/1000;
     lastTime = currentTime;
-    lag += delta;
 
-    while (lag >= requiredElapsed) {
-        if (keyState[" "] && !isJumping) {
-            isJumping = true;
-            velocity.y = -8;
-        }
-        if (keyState["d"] || keyState["a"]) {
-            isMoving = true;
-            direction.x = 0;
-            if (keyState["d"]) { direction.x += 1; }
-            if (keyState["a"]) { direction.x += -1; }
-        } else {
-            isMoving = false;
-        }
-        if (keyState["m1"] && !isGrappling) {
-            isGrappling = true;
-            let mouseVecFromPly = new Vec2(
-                mousePos.x - position.x,
-                mousePos.y - position.y
-            );
-            direction.x = mouseVecFromPly.x < 0 ? -1 : 1;
-            mouseVecFromPly.norm();
-            mouseVecFromPly.mult(12);
-            velocity.x = Math.abs(mouseVecFromPly.x);
-            velocity.y = mouseVecFromPly.y;
-        }
+    if (keyState[" "] && !isJumping) {
+        isJumping = true;
+        velocity.y = -8;
+    }
+    if (keyState["d"] || keyState["a"]) {
+        isMoving = true;
+        direction.x = 0;
+        if (keyState["d"]) { direction.x += 1; }
+        if (keyState["a"]) { direction.x += -1; }
+    } else {
+        isMoving = false;
+    }
+    if (keyState["m1"] && !isGrappling) {
+        isGrappling = true;
+        let mouseVecFromPly = mousePos.sub(position);
+        direction.x = mouseVecFromPly.x < 0 ? -1 : 1;
+        mouseVecFromPly = mouseVecFromPly.norm().scale(12);
+        velocity.x = Math.abs(mouseVecFromPly.x);
+        velocity.y = mouseVecFromPly.y;
+    }
 
-        if (position.y != canvas.height - 20 || velocity.y < 0) {
-            velocity.y += delta * gravity;
-            position.y += velocity.y;
-            position.y = Math.min(canvas.height - 20, position.y);
-        } else {
-            isJumping = false;
-            isGrappling = false;
-            velocity.y = 0;
-        }
+    if (position.y != canvas.height - 20 || velocity.y < 0) {
+        velocity.y += delta * gravity;
+        position.y += velocity.y;
+        position.y = Math.min(canvas.height - 20, position.y);
+    } else {
+        isJumping = false;
+        isGrappling = false;
+        velocity.y = 0;
+    }
 
-        if (isMoving) {
-            velocity.x += delta * accel;
-            velocity.x = Math.min(velocity.x, 4);
-        } else {
-            velocity.x += delta * accel * -1;
-            velocity.x = Math.max(0, velocity.x);
-        }
-        position.x += direction.x * velocity.x;
+    if (isMoving) {
+        velocity.x += delta * accel;
+        velocity.x = Math.min(velocity.x, 4);
+    } else {
+        velocity.x += delta * accel * -1 * friction;
+        velocity.x = Math.max(0, velocity.x);
+    }
+    position.x += direction.x * velocity.x;
 
-        lag -= requiredElapsed;
+    if (elapsedTime >= 1) {
+        elapsedTime = 0;
+        framePerSecond = frameCounter;
+        frameCounter = 0;
+    } else {
+        elapsedTime += delta;
+        frameCounter += 1;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -163,6 +168,7 @@ const loop = () => {
     ctx.fillText(`vel_x: ${velocity.x.toFixed(5)}`, 0, 15);
     ctx.fillText(`vel_y: ${velocity.y.toFixed(5)}`, 0, 30);
     ctx.fillText(`mouse_pos: (${mousePos.x.toFixed(2)}, ${mousePos.y.toFixed(2)})`, 0, 45);
+    ctx.fillText(`fps: ${framePerSecond}`, 0, 60);
 };
 
 loop();
